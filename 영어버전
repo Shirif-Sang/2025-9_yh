@@ -1,0 +1,279 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+
+#define MAX_TREES 100
+
+typedef enum {
+    APPLE,
+    PEAR,
+    PEACH,
+    TREE_TYPE_COUNT
+} TreeType;
+
+const char* treeNames[TREE_TYPE_COUNT] = {"Apple Tree", "Pear Tree", "Peach Tree"};
+
+typedef enum {
+    SEEDLING,
+    YOUNG,
+    MATURE,
+    OLD,
+    DEAD,
+    GROWTH_STAGE_COUNT
+} GrowthStage;
+
+const char* growthStageNames[GROWTH_STAGE_COUNT] = {"Seedling", "Young Tree", "Mature Tree", "Old Tree", "Dead Tree"};
+
+typedef struct {
+    TreeType type;
+    GrowthStage stage;
+    int age;
+    int moisture;
+    int health;
+    int fruits;
+} Tree;
+
+typedef struct {
+    Tree trees[MAX_TREES];
+    int treeCount;
+    int day;
+    int totalHarvest[TREE_TYPE_COUNT];
+} Orchard;
+
+const char* seasonNames[4] = {"Spring", "Summer", "Autumn", "Winter"};
+
+const char* currentSeason(int day) {
+    int season = (day / 90) % 4;
+    return seasonNames[season];
+}
+
+void initializeOrchard(Orchard* orchard) {
+    orchard->treeCount = 0;
+    orchard->day = 0;
+    for (int i = 0; i < TREE_TYPE_COUNT; i++) {
+        orchard->totalHarvest[i] = 0;
+    }
+}
+
+void plantTree(Orchard* orchard) {
+    if (orchard->treeCount >= MAX_TREES) {
+        printf("No more space to plant trees.\n");
+        return;
+    }
+
+    printf("Choose a tree type to plant:\n");
+    for (int i = 0; i < TREE_TYPE_COUNT; i++) {
+        printf("%d. %s\n", i + 1, treeNames[i]);
+    }
+    printf("Enter number: ");
+
+    int choice = 0;
+    scanf("%d", &choice);
+    while (getchar() != '\n');
+
+    if (choice < 1 || choice > TREE_TYPE_COUNT) {
+        printf("Invalid selection.\n");
+        return;
+    }
+
+    Tree t;
+    t.type = (TreeType)(choice - 1);
+    t.stage = SEEDLING;
+    t.age = 0;
+    t.moisture = 100;
+    t.health = 100;
+    t.fruits = 0;
+
+    orchard->trees[orchard->treeCount++] = t;
+    printf("Planted a %s.\n", treeNames[t.type]);
+}
+
+void waterTree(Orchard* orchard) {
+    if (orchard->treeCount == 0) {
+        printf("No trees have been planted.\n");
+        return;
+    }
+
+    printf("Select a tree to water:\n");
+    for (int i = 0; i < orchard->treeCount; i++) {
+        printf("%d. %s (Stage: %s, Health: %d, Moisture: %d)\n", i + 1,
+               treeNames[orchard->trees[i].type],
+               growthStageNames[orchard->trees[i].stage],
+               orchard->trees[i].health,
+               orchard->trees[i].moisture);
+    }
+    printf("Enter number: ");
+
+    int choice = 0;
+    scanf("%d", &choice);
+    while (getchar() != '\n');
+
+    if (choice < 1 || choice > orchard->treeCount) {
+        printf("Invalid selection.\n");
+        return;
+    }
+
+    Tree* t = &orchard->trees[choice - 1];
+    if (t->stage == DEAD) {
+        printf("You can't water a dead tree.\n");
+        return;
+    }
+
+    t->moisture += 20;
+    if (t->moisture > 100) t->moisture = 100;
+    printf("Watered the %s. Current moisture: %d\n", treeNames[t->type], t->moisture);
+}
+
+int didItRain() {
+    return rand() % 10 < 2; // 20% chance of rain
+}
+
+void simulateDay(Orchard* orchard) {
+    orchard->day++;
+    printf("\n--- Day %d (%s) ---\n", orchard->day, currentSeason(orchard->day));
+
+    int rain = didItRain();
+    if (rain) {
+        printf("It rained today! All trees gain moisture.\n");
+    }
+
+    for (int i = 0; i < orchard->treeCount; i++) {
+        Tree* t = &orchard->trees[i];
+        if (t->stage == DEAD) continue;
+
+        t->age++;
+        t->moisture -= 15;
+        if (rain) t->moisture += 20;
+        if (t->moisture > 100) t->moisture = 100;
+        if (t->moisture < 0) t->moisture = 0;
+
+        if (t->moisture < 30) t->health -= 10;
+        else if (t->moisture > 70) t->health += 5;
+
+        if (t->health > 100) t->health = 100;
+        if (t->health <= 0) {
+            t->stage = DEAD;
+            printf("Tree %s has died.\n", treeNames[t->type]);
+            continue;
+        }
+
+        if (t->age > 1200) t->stage = OLD;
+        else if (t->age > 600) t->stage = MATURE;
+        else if (t->age > 300) t->stage = YOUNG;
+
+        if (t->stage == MATURE || t->stage == OLD) {
+            int harvest = rand() % 5;
+            t->fruits += harvest;
+            if (t->fruits > 100) t->fruits = 100;
+        }
+
+        printf("%d. %s - Stage: %s, Age: %d, Health: %d, Moisture: %d, Fruits: %d\n",
+               i + 1, treeNames[t->type], growthStageNames[t->stage],
+               t->age, t->health, t->moisture, t->fruits);
+    }
+}
+
+void harvestFruits(Orchard* orchard) {
+    int total = 0;
+    for (int i = 0; i < orchard->treeCount; i++) {
+        Tree* t = &orchard->trees[i];
+        orchard->totalHarvest[t->type] += t->fruits;
+        total += t->fruits;
+        t->fruits = 0;
+    }
+
+    printf("Fruits harvested today: %d\n", total);
+    printf("Total harvest:\n");
+    for (int i = 0; i < TREE_TYPE_COUNT; i++) {
+        printf("- %s: %d\n", treeNames[i], orchard->totalHarvest[i]);
+    }
+}
+
+void fertilizeTree(Orchard* orchard) {
+    if (orchard->treeCount == 0) {
+        printf("No trees to fertilize.\n");
+        return;
+    }
+
+    printf("Select a tree to fertilize:\n");
+    for (int i = 0; i < orchard->treeCount; i++) {
+        printf("%d. %s (Health: %d)\n", i + 1,
+               treeNames[orchard->trees[i].type],
+               orchard->trees[i].health);
+    }
+
+    int choice = 0;
+    scanf("%d", &choice);
+    while (getchar() != '\n');
+
+    if (choice < 1 || choice > orchard->treeCount) {
+        printf("Invalid selection.\n");
+        return;
+    }
+
+    Tree* t = &orchard->trees[choice - 1];
+    if (t->stage == DEAD) {
+        printf("You can't fertilize a dead tree.\n");
+        return;
+    }
+
+    t->health += 10;
+    if (t->health > 100) t->health = 100;
+    printf("Fertilized %s. Health is now %d.\n", treeNames[t->type], t->health);
+}
+
+void showTreeStatus(Orchard* orchard) {
+    printf("\n==== All Tree Status ====\n");
+    for (int i = 0; i < orchard->treeCount; i++) {
+        Tree* t = &orchard->trees[i];
+        printf("%d. %s - Stage: %s, Age: %d, Health: %d, Moisture: %d, Fruits: %d\n",
+               i + 1, treeNames[t->type], growthStageNames[t->stage],
+               t->age, t->health, t->moisture, t->fruits);
+    }
+}
+
+void showMenu() {
+    printf("\n==== Orchard Simulator ====\n");
+    printf("1. Plant Tree\n");
+    printf("2. Water Tree\n");
+    printf("3. Simulate Day\n");
+    printf("4. Harvest Fruits\n");
+    printf("5. Fertilize Tree\n");
+    printf("6. Show All Tree Status\n");
+    printf("7. Exit\n");
+    printf("Choice: ");
+}
+
+int main() {
+    srand((unsigned int)time(NULL));
+
+    Orchard orchard;
+    initializeOrchard(&orchard);
+
+    while (1) {
+        showMenu();
+
+        int choice = 0;
+        if (scanf("%d", &choice) != 1) {
+            printf("Invalid input.\n");
+            while (getchar() != '\n');
+            continue;
+        }
+        while (getchar() != '\n');
+
+        switch (choice) {
+            case 1: plantTree(&orchard); break;
+            case 2: waterTree(&orchard); break;
+            case 3: simulateDay(&orchard); break;
+            case 4: harvestFruits(&orchard); break;
+            case 5: fertilizeTree(&orchard); break;
+            case 6: showTreeStatus(&orchard); break;
+            case 7:
+                printf("Exiting program.\n");
+                return 0;
+            default:
+                printf("Invalid choice.\n");
+        }
+    }
+}
