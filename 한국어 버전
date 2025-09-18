@@ -1,0 +1,279 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+
+#define MAX_TREE 100
+
+typedef enum {
+    사과나무,
+    배나무,
+    복숭아나무,
+    나무종류_갯수
+} 나무종류;
+
+const char* 나무이름[나무종류_갯수] = {"사과나무", "배나무", "복숭아나무"};
+
+typedef enum {
+    묘목,
+    어린나무,
+    성숙나무,
+    노령나무,
+    죽은나무,
+    성장단계_갯수
+} 성장단계;
+
+const char* 성장단계이름[성장단계_갯수] = {"묘목", "어린나무", "성숙나무", "노령나무", "죽은나무"};
+
+typedef struct {
+    나무종류 종류;
+    성장단계 단계;
+    int 나이;
+    int 수분량;
+    int 건강도;
+    int 열매수;
+} 나무;
+
+typedef struct {
+    나무 나무들[MAX_TREE];
+    int 나무수;
+    int 날짜;
+    int 누적수확[나무종류_갯수]; // 열매 종류별 누적 수확량
+} 과수원;
+
+const char* 계절이름[4] = {"봄", "여름", "가을", "겨울"};
+
+const char* 현재계절(int 날짜) {
+    int 계절 = (날짜 / 90) % 4;
+    return 계절이름[계절];
+}
+
+void 과수원초기화(과수원* orchard) {
+    orchard->나무수 = 0;
+    orchard->날짜 = 0;
+    for (int i = 0; i < 나무종류_갯수; i++) {
+        orchard->누적수확[i] = 0;
+    }
+}
+
+void 나무심기(과수원* orchard) {
+    if (orchard->나무수 >= MAX_TREE) {
+        printf("더 이상 나무를 심을 공간이 없습니다.\n");
+        return;
+    }
+
+    printf("심을 나무 종류를 선택하세요:\n");
+    for (int i = 0; i < 나무종류_갯수; i++) {
+        printf("%d. %s\n", i + 1, 나무이름[i]);
+    }
+    printf("번호 입력: ");
+
+    int 선택 = 0;
+    scanf("%d", &선택);
+    while (getchar() != '\n');
+
+    if (선택 < 1 || 선택 > 나무종류_갯수) {
+        printf("잘못된 선택입니다.\n");
+        return;
+    }
+
+    나무 t;
+    t.종류 = (나무종류)(선택 - 1);
+    t.단계 = 묘목;
+    t.나이 = 0;
+    t.수분량 = 100;
+    t.건강도 = 100;
+    t.열매수 = 0;
+
+    orchard->나무들[orchard->나무수++] = t;
+    printf("%s를 심었습니다.\n", 나무이름[t.종류]);
+}
+
+void 나무물주기(과수원* orchard) {
+    if (orchard->나무수 == 0) {
+        printf("심어진 나무가 없습니다.\n");
+        return;
+    }
+
+    printf("물 줄 나무를 선택하세요:\n");
+    for (int i = 0; i < orchard->나무수; i++) {
+        printf("%d. %s (단계: %s, 건강도: %d, 수분량: %d)\n", i + 1,
+               나무이름[orchard->나무들[i].종류],
+               성장단계이름[orchard->나무들[i].단계],
+               orchard->나무들[i].건강도,
+               orchard->나무들[i].수분량);
+    }
+    printf("번호 입력: ");
+
+    int 선택 = 0;
+    scanf("%d", &선택);
+    while (getchar() != '\n');
+
+    if (선택 < 1 || 선택 > orchard->나무수) {
+        printf("잘못된 선택입니다.\n");
+        return;
+    }
+
+    나무* t = &orchard->나무들[선택 - 1];
+    if (t->단계 == 죽은나무) {
+        printf("죽은 나무에는 물을 줄 수 없습니다.\n");
+        return;
+    }
+
+    t->수분량 += 20;
+    if (t->수분량 > 100) t->수분량 = 100;
+    printf("%s에 물을 주었습니다. 현재 수분량: %d\n", 나무이름[t->종류], t->수분량);
+}
+
+int 비가왔는가() {
+    return rand() % 10 < 2; // 20% 확률
+}
+
+void 하루흐름시뮬(과수원* orchard) {
+    orchard->날짜++;
+    printf("\n--- %d일째 (%s) ---\n", orchard->날짜, 현재계절(orchard->날짜));
+
+    int 비 = 비가왔는가();
+    if (비) {
+        printf("오늘은 비가 왔습니다! 모든 나무의 수분이 증가합니다.\n");
+    }
+
+    for (int i = 0; i < orchard->나무수; i++) {
+        나무* t = &orchard->나무들[i];
+        if (t->단계 == 죽은나무) continue;
+
+        t->나이++;
+        t->수분량 -= 15;
+        if (비) t->수분량 += 20;
+        if (t->수분량 > 100) t->수분량 = 100;
+        if (t->수분량 < 0) t->수분량 = 0;
+
+        if (t->수분량 < 30) t->건강도 -= 10;
+        else if (t->수분량 > 70) t->건강도 += 5;
+
+        if (t->건강도 > 100) t->건강도 = 100;
+        if (t->건강도 <= 0) {
+            t->단계 = 죽은나무;
+            printf("%s가 죽었습니다.\n", 나무이름[t->종류]);
+            continue;
+        }
+
+        if (t->나이 > 1200) t->단계 = 노령나무;
+        else if (t->나이 > 600) t->단계 = 성숙나무;
+        else if (t->나이 > 300) t->단계 = 어린나무;
+
+        if (t->단계 == 성숙나무 || t->단계 == 노령나무) {
+            int 수확 = rand() % 5;
+            t->열매수 += 수확;
+            if (t->열매수 > 100) t->열매수 = 100;
+        }
+
+        printf("%d번 나무: %s - 단계: %s, 나이: %d일, 건강도: %d, 수분량: %d, 열매: %d\n",
+               i + 1, 나무이름[t->종류], 성장단계이름[t->단계],
+               t->나이, t->건강도, t->수분량, t->열매수);
+    }
+}
+
+void 수확하기(과수원* orchard) {
+    int 총수확 = 0;
+    for (int i = 0; i < orchard->나무수; i++) {
+        나무* t = &orchard->나무들[i];
+        orchard->누적수확[t->종류] += t->열매수;
+        총수확 += t->열매수;
+        t->열매수 = 0;
+    }
+
+    printf("오늘 수확한 열매 개수: %d\n", 총수확);
+    printf("총 누적 수확:\n");
+    for (int i = 0; i < 나무종류_갯수; i++) {
+        printf("- %s: %d개\n", 나무이름[i], orchard->누적수확[i]);
+    }
+}
+
+void 비료주기(과수원* orchard) {
+    if (orchard->나무수 == 0) {
+        printf("심어진 나무가 없습니다.\n");
+        return;
+    }
+
+    printf("비료를 줄 나무를 선택하세요:\n");
+    for (int i = 0; i < orchard->나무수; i++) {
+        printf("%d. %s (건강도: %d)\n", i + 1,
+               나무이름[orchard->나무들[i].종류],
+               orchard->나무들[i].건강도);
+    }
+
+    int 선택 = 0;
+    scanf("%d", &선택);
+    while (getchar() != '\n');
+
+    if (선택 < 1 || 선택 > orchard->나무수) {
+        printf("잘못된 선택입니다.\n");
+        return;
+    }
+
+    나무* t = &orchard->나무들[선택 - 1];
+    if (t->단계 == 죽은나무) {
+        printf("죽은 나무에는 비료를 줄 수 없습니다.\n");
+        return;
+    }
+
+    t->건강도 += 10;
+    if (t->건강도 > 100) t->건강도 = 100;
+    printf("%s에 비료를 주었습니다. 건강도: %d\n", 나무이름[t->종류], t->건강도);
+}
+
+void 전체상태출력(과수원* orchard) {
+    printf("\n==== 전체 나무 상태 ====\n");
+    for (int i = 0; i < orchard->나무수; i++) {
+        나무* t = &orchard->나무들[i];
+        printf("%d. %s - 단계: %s, 나이: %d일, 건강도: %d, 수분량: %d, 열매: %d\n",
+               i + 1, 나무이름[t->종류], 성장단계이름[t->단계],
+               t->나이, t->건강도, t->수분량, t->열매수);
+    }
+}
+
+void 메뉴출력() {
+    printf("\n==== 과수원 시뮬레이터 ====\n");
+    printf("1. 나무 심기\n");
+    printf("2. 물주기\n");
+    printf("3. 하루 진행\n");
+    printf("4. 수확하기\n");
+    printf("5. 비료 주기\n");
+    printf("6. 전체 나무 상태 보기\n");
+    printf("7. 종료\n");
+    printf("선택: ");
+}
+
+int main() {
+    srand((unsigned int)time(NULL));
+
+    과수원 orchard;
+    과수원초기화(&orchard);
+
+    while (1) {
+        메뉴출력();
+
+        int 선택 = 0;
+        if (scanf("%d", &선택) != 1) {
+            printf("잘못된 입력입니다.\n");
+            while (getchar() != '\n');
+            continue;
+        }
+        while (getchar() != '\n');
+
+        switch (선택) {
+            case 1: 나무심기(&orchard); break;
+            case 2: 나무물주기(&orchard); break;
+            case 3: 하루흐름시뮬(&orchard); break;
+            case 4: 수확하기(&orchard); break;
+            case 5: 비료주기(&orchard); break;
+            case 6: 전체상태출력(&orchard); break;
+            case 7:
+                printf("프로그램을 종료합니다.\n");
+                return 0;
+            default:
+                printf("잘못된 선택입니다.\n");
+        }
+    }
+}
